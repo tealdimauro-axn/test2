@@ -92,7 +92,7 @@ class WC_Promotions_Manager {
         $total = count($filtered);
         $paged = isset($_GET['wc_pm_paged']) ? max(1, intval($_GET['wc_pm_paged'])) : 1;
         $offset = ($paged - 1) * $this->per_page;
-        $paginated = array_slice($filtered, $offset, $this->per_page);
+        $paginated = array_slice($filtered, $offset, $this->per_page, true); // preserve keys (product IDs)
         $total_pages = ceil($total / $this->per_page);
         ?>
         <div class="wrap wc-pm-container">
