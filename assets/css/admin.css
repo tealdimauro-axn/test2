@@ -329,9 +329,13 @@
 }
 
 /* Column widths */
-.wc-pm-table .wc-pm-check-col { width: 30px; min-width: 30px; }
-.wc-pm-table .column-primary { max-width: 300px; }
+.wc-pm-table .wc-pm-check-col { width: 30px !important; min-width: 30px; max-width: 30px; }
+.wc-pm-table td.wc-pm-check-col { padding: 6px 4px !important; text-align: center !important; }
 .wc-pm-table .wc-pm-price { white-space: nowrap; }
+
+/* Force column-primary narrow */
+.wc-pm-table th.column-primary { width: 280px !important; max-width: 280px !important; }
+.wc-pm-table td.column-primary { max-width: 280px !important; overflow: hidden !important; }
 
 /* Product Image Thumbnail */
 .wc-pm-product-thumb {
@@ -344,22 +348,22 @@
 }
 
 /* Column Primary - compact row */
-.wc-pm-table .column-primary {
-    display: flex;
+.wc-pm-table td.column-primary {
+    display: flex !important;
     align-items: center;
     gap: 8px;
-    overflow: hidden;
+    overflow: hidden !important;
 }
 
-.wc-pm-table .column-primary strong {
+.wc-pm-table td.column-primary strong {
     font-weight: 600;
     color: var(--wc-pm-gray-800);
     display: block;
     line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 220px;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 180px !important;
 }
 
 .wc-pm-product-info {
@@ -367,7 +371,7 @@
     flex-direction: column;
     min-width: 0;
     flex: 1;
-    overflow: hidden;
+    overflow: hidden !important;
 }
 
 .wc-pm-product-id {
@@ -381,12 +385,8 @@
 .wc-pm-discount-percent,
 .wc-pm-status,
 .wc-pm-time-left,
-.wc-pm-table td:nth-child(3),
-.wc-pm-table td:nth-child(6),
-.wc-pm-table td:nth-child(7),
-.wc-pm-table td:nth-child(8),
-.wc-pm-table td:nth-child(9),
-.wc-pm-table td:nth-child(10) {
+.wc-pm-badge,
+.wc-pm-actions-cell {
     white-space: nowrap;
 }
 
