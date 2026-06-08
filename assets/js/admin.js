@@ -1,12 +1,81 @@
 /**
- * WooCommerce Promotions Manager v2.0 - Admin JavaScript
- * Modern UI with toasts, modals, inline editing, bulk actions
+ * WooCommerce Promotions Manager v2.1 - Admin JavaScript
+ * Modern UI with toasts, modals, inline editing, bulk actions, dynamic refresh
  */
 
 (function($) {
     'use strict';
 
     $(document).ready(function() {
+
+        // ==========================================
+        // Dynamic Page Refresh (replaces location.reload)
+        // ==========================================
+        function getCurrentFilters() {
+            return {
+                search: $('[name="wc_pm_search"]').val() || '',
+                date_from: $('[name="wc_pm_date_from"]').val() || '',
+                date_to: $('[name="wc_pm_date_to"]').val() || '',
+                type: $('[name="wc_pm_type"]').val() || '',
+                paged: getCurrentPage()
+            };
+        }
+
+        function getCurrentPage() {
+            var currentText = $('.wc-pm-pagination .page-numbers.current').text();
+            var match = currentText.match(/Página (\d+) de/);
+            return match ? parseInt(match[1]) : 1;
+        }
+
+        function refreshStats() {
+            $.ajax({
+                url: wcPmAjax.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'wc_pm_refresh_stats',
+                    nonce: wcPmAjax.nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $('.wc-pm-stats-grid').html(response.data.stats_html);
+                    }
+                }
+            });
+        }
+
+        function refreshTable(filters) {
+            filters = filters || getCurrentFilters();
+
+            $.ajax({
+                url: wcPmAjax.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'wc_pm_refresh_table',
+                    nonce: wcPmAjax.nonce,
+                    search: filters.search,
+                    date_from: filters.date_from,
+                    date_to: filters.date_to,
+                    type: filters.type,
+                    paged: filters.paged
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $('#wc-pm-promotions-list').html(response.data.table_html);
+                        if (response.data.pagination_html) {
+                            $('.wc-pm-pagination').html(response.data.pagination_html);
+                        } else {
+                            $('.wc-pm-pagination').empty();
+                        }
+                    }
+                }
+            });
+        }
+
+        function refreshPage() {
+            refreshStats();
+            refreshTable();
+            updateBulkButton();
+        }
 
         // ==========================================
         // Toast Notifications System
@@ -202,7 +271,7 @@
                             });
                         });
 
-                        setTimeout(() => location.reload(), 1000);
+                        setTimeout(() => refreshPage(), 500);
                     } else {
                         showToast(response.data.message || wcPmAjax.error, 'error');
                     }
@@ -222,12 +291,18 @@
             var $button = $(this);
             $button.prop('disabled', true).html('<span class="wc-pm-spinner"></span> Exportando...');
 
+            var filters = getCurrentFilters();
+
             $.ajax({
                 url: wcPmAjax.ajaxUrl,
                 type: 'POST',
                 data: {
                     action: 'wc_pm_export_csv',
-                    nonce: wcPmAjax.nonce
+                    nonce: wcPmAjax.nonce,
+                    search: filters.search,
+                    date_from: filters.date_from,
+                    date_to: filters.date_to,
+                    type: filters.type
                 },
                 success: function(response) {
                     if (response.success) {
@@ -261,6 +336,7 @@
             if ($editable.find('input').length > 0) return;
 
             var currentValue = $editable.data('value');
+            var currentFormatted = $editable.text().trim();
             var productId = $editable.data('product-id') || '';
             var variantId = $editable.data('variant-id') || '';
             var targetId = variantId || productId;
@@ -275,12 +351,12 @@
                 var newValue = parseFloat($input.val());
                 
                 if (isNaN(newValue) || newValue < 0) {
-                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                     return;
                 }
 
                 if (newValue == currentValue) {
-                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                     return;
                 }
 
@@ -305,12 +381,12 @@
                             $cardOrRow.find('.wc-pm-discount-percent, .wc-pm-variant-discount').text('-' + response.data.new_discount + '%');
                         } else {
                             showToast(response.data.message || wcPmAjax.error, 'error');
-                            $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                            $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                         }
                     },
                     error: function() {
                         showToast(wcPmAjax.error, 'error');
-                        $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                        $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                     }
                 });
             }
@@ -321,7 +397,7 @@
                     savePrice();
                 }
                 if (e.key === 'Escape') {
-                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                 }
             });
 
@@ -329,11 +405,6 @@
                 setTimeout(savePrice, 200);
             });
         });
-
-        function wcPrice(amount) {
-            // Simple price formatting - WooCommerce would do this better server-side
-            return parseFloat(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
-        }
 
         // ==========================================
         // Delistar promoción (single)
@@ -375,13 +446,15 @@
                             var parentId = $button.data('parent-id');
                             var $variantsContainer = $('.wc-pm-variants-row[data-parent-id="' + parentId + '"] .wc-pm-variants-container');
                             loadVariants(parentId, $variantsContainer);
-                            setTimeout(() => location.reload(), 1500);
+                            setTimeout(() => refreshPage(), 800);
                         } else {
                             $row.fadeOut(300, function() {
                                 $(this).remove();
                                 if ($('.wc-pm-table tbody tr:not(.wc-pm-variants-row)').length === 0) {
-                                    location.reload();
+                                    refreshTable();
                                 }
+                                refreshStats();
+                                updateBulkButton();
                             });
                         }
                     } else {

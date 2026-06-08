@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce Promotions Manager
  * Plugin URI: https://github.com/tealdimauro-axn/test2
  * Description: Gestiona promociones activas de WooCommerce con dashboard, búsqueda, filtros, bulk actions, edición inline y exportación CSV.
- * Version: 2.0.1
+ * Version: 2.1.0
  * Author: Teal Dimauro
  * Text Domain: wc-promotions-manager
  * Domain Path: /languages
@@ -17,10 +17,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('WC_PM_VERSION', '2.0.1');
+define('WC_PM_VERSION', '2.1.0');
 define('WC_PM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WC_PM_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('WC_PM_LOG_FILE', WC_PM_PLUGIN_DIR . 'activity.log');
 
 class WC_Promotions_Manager {
 
@@ -46,6 +45,8 @@ class WC_Promotions_Manager {
         add_action('wp_ajax_wc_pm_update_sale_price', array($this, 'ajax_update_sale_price'));
         add_action('wp_ajax_wc_pm_export_csv', array($this, 'ajax_export_csv'));
         add_action('wp_ajax_wc_pm_get_stats', array($this, 'ajax_get_stats'));
+        add_action('wp_ajax_wc_pm_refresh_table', array($this, 'ajax_refresh_table'));
+        add_action('wp_ajax_wc_pm_refresh_stats', array($this, 'ajax_refresh_stats'));
     }
 
     public function add_admin_menu() {
@@ -81,8 +82,8 @@ class WC_Promotions_Manager {
     }
 
     public function render_promotions_page() {
-        $stats = $this->get_promotions_stats();
         $promotions = $this->get_active_promotions();
+        $stats = $this->get_promotions_stats($promotions);
         $search = isset($_GET['wc_pm_search']) ? sanitize_text_field($_GET['wc_pm_search']) : '';
         $date_from = isset($_GET['wc_pm_date_from']) ? sanitize_text_field($_GET['wc_pm_date_from']) : '';
         $date_to = isset($_GET['wc_pm_date_to']) ? sanitize_text_field($_GET['wc_pm_date_to']) : '';
@@ -404,7 +405,14 @@ class WC_Promotions_Manager {
      * FIXED: Query ALL products (no meta_query), filter in PHP.
      * Variable products don't have _sale_price at parent level, so meta_query excluded them.
      */
-    public function get_active_promotions() {
+    public function get_active_promotions($use_cache = true) {
+        if ($use_cache) {
+            $cached = get_transient('wc_pm_active_promotions');
+            if ($cached !== false) {
+                return $cached;
+            }
+        }
+
         // Query ALL products — we filter for sales in PHP
         $args = array(
             'post_type' => 'product',
@@ -520,11 +528,21 @@ class WC_Promotions_Manager {
             }
         }
 
+        if ($use_cache) {
+            set_transient('wc_pm_active_promotions', $promotions, 5 * MINUTE_IN_SECONDS);
+        }
+
         return $promotions;
     }
 
-    private function get_promotions_stats() {
-        $promotions = $this->get_active_promotions();
+    private function bust_promotions_cache() {
+        delete_transient('wc_pm_active_promotions');
+    }
+
+    private function get_promotions_stats($promotions = null) {
+        if ($promotions === null) {
+            $promotions = $this->get_active_promotions();
+        }
         $total = count($promotions);
         $total_discount = 0;
         $total_savings = 0;
@@ -563,8 +581,24 @@ class WC_Promotions_Manager {
         return isset($labels[$type]) ? $labels[$type] : ucfirst($type);
     }
 
+    private static function get_log_file_path() {
+        $upload_dir = wp_upload_dir();
+        $log_dir = $upload_dir['basedir'] . '/wc-promotions-manager';
+        if (!file_exists($log_dir)) {
+            wp_mkdir_p($log_dir);
+            if (!file_exists($log_dir . '/.htaccess')) {
+                file_put_contents($log_dir . '/.htaccess', "Deny from all\n");
+            }
+            if (!file_exists($log_dir . '/index.php')) {
+                file_put_contents($log_dir . '/index.php', "<?php // Silence is golden\n");
+            }
+        }
+        return $log_dir . '/activity.log';
+    }
+
     // Activity Log
     private function log_action($action, $data) {
+        $log_file = self::get_log_file_path();
         $log_entry = array(
             'timestamp' => current_time('mysql'),
             'user' => wp_get_current_user()->display_name,
@@ -572,17 +606,30 @@ class WC_Promotions_Manager {
             'data' => $data,
         );
 
-        $log_line = json_encode($log_entry) . "\n";
-        file_put_contents(WC_PM_LOG_FILE, $log_line, FILE_APPEND | LOCK_EX);
+        $log_line = json_encode($log_entry, JSON_UNESCAPED_UNICODE) . "\n";
+        file_put_contents($log_file, $log_line, FILE_APPEND | LOCK_EX);
+
+        // Rotate: keep last 100 entries
+        self::rotate_log($log_file);
+    }
+
+    private static function rotate_log($log_file) {
+        if (!file_exists($log_file)) return;
+        $lines = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (count($lines) > 100) {
+            $lines = array_slice($lines, -100);
+            file_put_contents($log_file, implode("\n", $lines) . "\n", LOCK_EX);
+        }
     }
 
     private function render_activity_log() {
-        if (!file_exists(WC_PM_LOG_FILE)) {
+        $log_file = self::get_log_file_path();
+        if (!file_exists($log_file)) {
             echo '<p class="wc-pm-no-activity">' . esc_html__('No hay actividad registrada aún.', 'wc-promotions-manager') . '</p>';
             return;
         }
 
-        $lines = array_filter(array_map('trim', file(WC_PM_LOG_FILE)));
+        $lines = array_filter(array_map('trim', file($log_file)));
         $entries = array_reverse($lines);
         $entries = array_slice($entries, 0, 10);
 
@@ -645,6 +692,8 @@ class WC_Promotions_Manager {
         $product->set_date_on_sale_to(null);
         $product->save();
 
+        $this->bust_promotions_cache();
+
         $this->log_action('delist', array(
             'product_id' => $target_id,
             'product_name' => $product_name,
@@ -691,6 +740,8 @@ class WC_Promotions_Manager {
             }
         }
 
+        $this->bust_promotions_cache();
+
         wp_send_json_success(array(
             'message' => sprintf(
                 _n('%d promoción delistada correctamente', '%d promociones delistadas correctamente', $delisted, 'wc-promotions-manager'),
@@ -728,6 +779,8 @@ class WC_Promotions_Manager {
         $product->set_sale_price($new_price);
         $product->save();
 
+        $this->bust_promotions_cache();
+
         $this->log_action('price_update', array(
             'product_id' => $target_id,
             'product_name' => $product->get_name(),
@@ -750,7 +803,13 @@ class WC_Promotions_Manager {
             wp_send_json_error(array('message' => __('No tiene permisos suficientes', 'wc-promotions-manager')));
         }
 
+        $search = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
+        $date_from = isset($_POST['date_from']) ? sanitize_text_field($_POST['date_from']) : '';
+        $date_to = isset($_POST['date_to']) ? sanitize_text_field($_POST['date_to']) : '';
+        $type_filter = isset($_POST['type']) ? sanitize_text_field($_POST['type']) : '';
+
         $promotions = $this->get_active_promotions();
+        $promotions = $this->apply_filters($promotions, $search, $date_from, $date_to, $type_filter);
         
         ob_start();
         $output = fopen('php://output', 'w');
@@ -805,9 +864,17 @@ class WC_Promotions_Manager {
             $variant->set_sale_price('');
             $variant->set_date_on_sale_from(null);
             $variant->set_date_on_sale_to(null);
+        } elseif ($action === 'enable') {
+            $sale_price = isset($_POST['sale_price']) ? floatval($_POST['sale_price']) : 0;
+            if ($sale_price <= 0) {
+                wp_send_json_error(array('message' => __('Se requiere un precio de oferta válido', 'wc-promotions-manager')));
+            }
+            $variant->set_sale_price($sale_price);
         }
 
         $variant->save();
+
+        $this->bust_promotions_cache();
 
         $this->log_action('variant_toggle', array(
             'variant_id' => $variant_id,
@@ -922,6 +989,103 @@ class WC_Promotions_Manager {
         }
 
         wp_send_json_success(array('stats' => $this->get_promotions_stats()));
+    }
+
+    public function ajax_refresh_table() {
+        check_ajax_referer('wc_pm_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => __('No tiene permisos suficientes', 'wc-promotions-manager')));
+        }
+
+        $search = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
+        $date_from = isset($_POST['date_from']) ? sanitize_text_field($_POST['date_from']) : '';
+        $date_to = isset($_POST['date_to']) ? sanitize_text_field($_POST['date_to']) : '';
+        $type_filter = isset($_POST['type']) ? sanitize_text_field($_POST['type']) : '';
+        $paged = isset($_POST['paged']) ? max(1, intval($_POST['paged'])) : 1;
+
+        $promotions = $this->get_active_promotions();
+        $filtered = $this->apply_filters($promotions, $search, $date_from, $date_to, $type_filter);
+        $total = count($filtered);
+        $offset = ($paged - 1) * $this->per_page;
+        $paginated = array_slice($filtered, $offset, $this->per_page, true);
+        $total_pages = max(1, ceil($total / $this->per_page));
+
+        ob_start();
+        $this->render_promotions_table($paginated);
+        $table_html = ob_get_clean();
+
+        $pagination_html = '';
+        if ($total_pages > 1) {
+            $base_url = add_query_arg(array(
+                'page' => 'wc-promotions-manager',
+                'wc_pm_search' => $search,
+                'wc_pm_type' => $type_filter,
+                'wc_pm_date_from' => $date_from,
+                'wc_pm_date_to' => $date_to,
+            ), admin_url('admin.php'));
+
+            ob_start();
+            if ($paged > 1): ?>
+                <a href="<?php echo esc_url(add_query_arg('wc_pm_paged', $paged - 1, $base_url)); ?>" class="page-numbers">&laquo; <?php esc_html_e('Anterior', 'wc-promotions-manager'); ?></a>
+            <?php endif; ?>
+            <span class="page-numbers current"><?php printf(esc_html__('Página %d de %d', 'wc-promotions-manager'), $paged, $total_pages); ?></span>
+            <?php if ($paged < $total_pages): ?>
+                <a href="<?php echo esc_url(add_query_arg('wc_pm_paged', $paged + 1, $base_url)); ?>" class="page-numbers"><?php esc_html_e('Siguiente', 'wc-promotions-manager'); ?> &raquo;</a>
+            <?php endif;
+            $pagination_html = ob_get_clean();
+        }
+
+        wp_send_json_success(array(
+            'table_html' => $table_html,
+            'pagination_html' => $pagination_html,
+            'total' => $total,
+        ));
+    }
+
+    public function ajax_refresh_stats() {
+        check_ajax_referer('wc_pm_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => __('No tiene permisos suficientes', 'wc-promotions-manager')));
+        }
+
+        $stats = $this->get_promotions_stats();
+
+        ob_start();
+        ?>
+        <div class="wc-pm-stat-card wc-pm-stat-primary">
+            <div class="wc-pm-stat-icon"><span class="dashicons dashicons-visibility"></span></div>
+            <div class="wc-pm-stat-content">
+                <span class="wc-pm-stat-value"><?php echo esc_html($stats['total_active']); ?></span>
+                <span class="wc-pm-stat-label"><?php echo esc_html__('Promociones Activas', 'wc-promotions-manager'); ?></span>
+            </div>
+        </div>
+        <div class="wc-pm-stat-card wc-pm-stat-success">
+            <div class="wc-pm-stat-icon"><span class="dashicons dashicons-chart-bar"></span></div>
+            <div class="wc-pm-stat-content">
+                <span class="wc-pm-stat-value"><?php echo esc_html($stats['avg_discount']); ?>%</span>
+                <span class="wc-pm-stat-label"><?php echo esc_html__('Descuento Promedio', 'wc-promotions-manager'); ?></span>
+            </div>
+        </div>
+        <div class="wc-pm-stat-card wc-pm-stat-warning">
+            <div class="wc-pm-stat-icon"><span class="dashicons dashicons-calendar"></span></div>
+            <div class="wc-pm-stat-content">
+                <span class="wc-pm-stat-value"><?php echo esc_html($stats['expiring_soon']); ?></span>
+                <span class="wc-pm-stat-label"><?php echo esc_html__('Expiran en 7 días', 'wc-promotions-manager'); ?></span>
+            </div>
+        </div>
+        <div class="wc-pm-stat-card wc-pm-stat-info">
+            <div class="wc-pm-stat-icon"><span class="dashicons dashicons-money-alt"></span></div>
+            <div class="wc-pm-stat-content">
+                <span class="wc-pm-stat-value"><?php echo wc_price($stats['total_savings']); ?></span>
+                <span class="wc-pm-stat-label"><?php echo esc_html__('Ahorro Total Cliente', 'wc-promotions-manager'); ?></span>
+            </div>
+        </div>
+        <?php
+        $stats_html = ob_get_clean();
+
+        wp_send_json_success(array('stats_html' => $stats_html));
     }
 }
 

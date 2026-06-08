@@ -589,35 +589,6 @@
     transform: translateY(-1px);
 }
 
-/* Toggle Variants */
-.toggle-variants {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
-    transition: var(--wc-pm-transition);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.toggle-variants:hover {
-    background: var(--wc-pm-gray-200);
-}
-
-.toggle-variants .dashicons {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-    color: var(--wc-pm-primary);
-    transition: transform 0.2s ease;
-}
-
-.toggle-variants.active .dashicons {
-    transform: rotate(45deg);
-}
-
 /* Variants Row */
 .wc-pm-variants-row {
     background: var(--wc-pm-gray-50);

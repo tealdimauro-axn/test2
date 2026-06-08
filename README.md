@@ -1,6 +1,17 @@
-# WooCommerce Promotions Manager v2.0
+# WooCommerce Promotions Manager v2.1
 
 Un plugin de WordPress/WooCommerce moderno y completo para gestionar promociones activas de manera eficiente.
+
+## ✨ Novedades v2.1
+
+- 🔒 **Seguridad mejorada** — Log de actividad movido a `wp-content/uploads`, protegido con `.htaccess`
+- ⚡ **Performance** — Caché con transients (5 min) para evitar consultas repetidas a la base de datos
+- 🔄 **Actualización dinámica** — La tabla y stats se refrescan vía AJAX sin recargar la página completa
+- 🐛 **Fix: toggle_variant_promo** — Ahora soporta correctamente habilitar y deshabilitar variantes
+- 📥 **CSV con filtros** — La exportación respeta los filtros activos (búsqueda, tipo, fechas)
+- 🗑️ **Rotación de logs** — Activity log limitado a las últimas 100 entradas
+- 💰 **Precios formateados** — Inline editing usa formato de moneda del servidor, no JS naive
+- 🧹 **uninstall.php** — Limpieza completa al desinstalar el plugin
 
 ## ✨ Novedades v2.0
 
@@ -80,7 +91,7 @@ wc-promotions-manager/
 │   │   └── admin.css            # Estilos modernos del panel
 │   └── js/
 │       └── admin.js             # JavaScript con toasts, modales, inline edit
-├── activity.log                 # Log de actividad (auto-generado)
+├── uninstall.php                # Limpieza al desinstalar
 └── README.md                    # Este archivo
 ```
 
@@ -131,8 +142,10 @@ wc-promotions-manager/
 - `wc_pm_update_sale_price`: Actualiza el precio de promo inline
 - `wc_pm_get_product_variants`: Obtiene y renderiza las variantes de un producto variable
 - `wc_pm_toggle_variant_promo`: Habilita/deshabilita promoción de una variante
-- `wc_pm_export_csv`: Genera y descarga CSV de todas las promos
+- `wc_pm_export_csv`: Genera y descarga CSV de promos (respeta filtros activos)
 - `wc_pm_get_stats`: Obtiene estadísticas actualizadas
+- `wc_pm_refresh_table`: Refresca la tabla vía AJAX (nuevo en v2.1)
+- `wc_pm_refresh_stats`: Refresca las cards de stats vía AJAX (nuevo en v2.1)
 
 ## Seguridad
 
@@ -154,6 +167,17 @@ Para reportar errores o solicitar funcionalidades, por favor crea un issue en el
 GPL v2 o posterior
 
 ## Changelog
+
+### 2.1.0
+- 🔒 Log de actividad movido a `wp-content/uploads` con protección `.htaccess`
+- ⚡ Caché con transients (5 minutos) para `get_active_promotions()`
+- 🔄 Refresco dinámico de tabla y stats vía AJAX (`wc_pm_refresh_table`, `wc_pm_refresh_stats`)
+- 🐛 Fix: `wc_pm_toggle_variant_promo` ahora soporta `enable` además de `disable`
+- 📥 Exportación CSV ahora respeta los filtros activos
+- 🗑️ Rotación automática de activity log (últimas 100 entradas)
+- 💰 Inline editing usa precios formateados por el servidor (eliminado `wcPrice()` JS)
+- 🧹 `uninstall.php` para limpieza completa al desinstalar
+- 🎨 CSS: reglas `.toggle-variants` duplicadas eliminadas
 
 ### 2.0.0
 - Dashboard con estadísticas en tiempo real
