@@ -258,10 +258,12 @@
             e.stopPropagation();
             
             var $editable = $(this);
-            if ($editable.find('input').length > 0) return; // Already editing
+            if ($editable.find('input').length > 0) return;
 
             var currentValue = $editable.data('value');
-            var productId = $editable.data('product-id') || $editable.data('variant-id');
+            var productId = $editable.data('product-id') || '';
+            var variantId = $editable.data('variant-id') || '';
+            var targetId = variantId || productId;
             var field = $editable.data('field');
 
             var $input = $(`<input type="number" step="0.01" min="0" class="wc-pm-edit-input" value="${currentValue}">`);
@@ -269,21 +271,19 @@
             $editable.empty().append($input);
             $input.focus().select();
 
-            // Save on blur or enter
             function savePrice() {
                 var newValue = parseFloat($input.val());
                 
                 if (isNaN(newValue) || newValue < 0) {
-                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}">${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                     return;
                 }
 
                 if (newValue == currentValue) {
-                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}">${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                     return;
                 }
 
-                // Save via AJAX
                 $editable.html('<span class="wc-pm-spinner" style="width:14px;height:14px;border-width:2px;"></span>');
 
                 $.ajax({
@@ -293,24 +293,24 @@
                         action: 'wc_pm_update_sale_price',
                         nonce: wcPmAjax.nonce,
                         product_id: productId,
+                        variant_id: variantId || 0,
                         new_price: newValue
                     },
                     success: function(response) {
                         if (response.success) {
-                            $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${newValue}">${response.data.new_price}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                            $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${newValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${response.data.new_price}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                             showToast(response.data.message, 'success');
                             
-                            // Update discount percent
-                            var $row = $editable.closest('tr');
-                            $row.find('.wc-pm-discount-percent').text('-' + response.data.new_discount + '%');
+                            var $cardOrRow = $editable.closest('.wc-pm-variant-card, tr');
+                            $cardOrRow.find('.wc-pm-discount-percent, .wc-pm-variant-discount').text('-' + response.data.new_discount + '%');
                         } else {
                             showToast(response.data.message || wcPmAjax.error, 'error');
-                            $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}">${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                            $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                         }
                     },
                     error: function() {
                         showToast(wcPmAjax.error, 'error');
-                        $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}">${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                        $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                     }
                 });
             }
@@ -321,7 +321,7 @@
                     savePrice();
                 }
                 if (e.key === 'Escape') {
-                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}">${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${wcPrice(currentValue)}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                 }
             });
 

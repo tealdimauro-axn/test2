@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce Promotions Manager
  * Plugin URI: https://github.com/tealdimauro-axn/test2
  * Description: Gestiona promociones activas de WooCommerce con dashboard, búsqueda, filtros, bulk actions, edición inline y exportación CSV.
- * Version: 2.0.0
+ * Version: 2.0.1
  * Author: Teal Dimauro
  * Text Domain: wc-promotions-manager
  * Domain Path: /languages
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('WC_PM_VERSION', '2.0.0');
+define('WC_PM_VERSION', '2.0.1');
 define('WC_PM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WC_PM_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WC_PM_LOG_FILE', WC_PM_PLUGIN_DIR . 'activity.log');
@@ -66,6 +66,7 @@ class WC_Promotions_Manager {
         }
 
         wp_enqueue_style('wc-pm-admin', WC_PM_PLUGIN_URL . 'assets/css/admin.css', array(), WC_PM_VERSION);
+        wp_enqueue_style('wc-pm-thickbox');
         wp_enqueue_script('wc-pm-admin', WC_PM_PLUGIN_URL . 'assets/js/admin.js', array('jquery'), WC_PM_VERSION, true);
 
         wp_localize_script('wc-pm-admin', 'wcPmAjax', array(
@@ -92,8 +93,8 @@ class WC_Promotions_Manager {
         $total = count($filtered);
         $paged = isset($_GET['wc_pm_paged']) ? max(1, intval($_GET['wc_pm_paged'])) : 1;
         $offset = ($paged - 1) * $this->per_page;
-        $paginated = array_slice($filtered, $offset, $this->per_page, true); // preserve keys (product IDs)
-        $total_pages = ceil($total / $this->per_page);
+        $paginated = array_slice($filtered, $offset, $this->per_page, true);
+        $total_pages = max(1, ceil($total / $this->per_page));
         ?>
         <div class="wrap wc-pm-container">
             <div class="wc-pm-header">
@@ -252,7 +253,7 @@ class WC_Promotions_Manager {
                     <th><?php esc_html_e('Tipo', 'wc-promotions-manager'); ?></th>
                     <th><?php esc_html_e('Precio Normal', 'wc-promotions-manager'); ?></th>
                     <th><?php esc_html_e('Precio Promo', 'wc-promotions-manager'); ?></th>
-                    <th class="wc-pm-editable-col"><?php esc_html_e('Descuento %', 'wc-promotions-manager'); ?></th>
+                    <th><?php esc_html_e('Descuento %', 'wc-promotions-manager'); ?></th>
                     <th><?php esc_html_e('Inicio', 'wc-promotions-manager'); ?></th>
                     <th><?php esc_html_e('Fin', 'wc-promotions-manager'); ?></th>
                     <th><?php esc_html_e('Tiempo Restante', 'wc-promotions-manager'); ?></th>
@@ -269,6 +270,25 @@ class WC_Promotions_Manager {
         <?php
     }
 
+    private function get_product_image_html($product_id, $size = '40') {
+        $product = wc_get_product($product_id);
+        if (!$product) return '';
+
+        $image_id = $product->get_image_id();
+        if ($image_id) {
+            $image_url = wp_get_attachment_image_url($image_id, 'thumbnail');
+        } else {
+            $image_url = wc_placeholder_img_src('thumbnail');
+        }
+
+        return sprintf(
+            '<img src="%s" alt="" width="%s" height="%s" class="wc-pm-product-thumb" loading="lazy">',
+            esc_url($image_url),
+            esc_attr($size),
+            esc_attr($size)
+        );
+    }
+
     private function render_product_row($product_id, $promo_data) {
         $product = wc_get_product($product_id);
 
@@ -279,22 +299,25 @@ class WC_Promotions_Manager {
         $is_variable = $product->is_type('variable');
         $row_class = $is_variable ? 'wc-pm-variable-product' : '';
         $time_left = $this->get_time_remaining($promo_data['date_to']);
-        $is_expiring_soon = $time_left && $time_left <= 7 * 24 * 3600; // 7 days
+        $is_expiring_soon = $time_left && $time_left <= 7 * 24 * 3600;
         ?>
         <tr class="<?php echo esc_attr($row_class); ?>" data-product-id="<?php echo esc_attr($product_id); ?>">
             <td class="wc-pm-check-col">
                 <input type="checkbox" class="wc-pm-select-item" data-product-id="<?php echo esc_attr($product_id); ?>">
             </td>
             <td class="column-primary">
+                <?php echo $this->get_product_image_html($product_id); ?>
                 <button class="toggle-variants button-link"
                         data-product-id="<?php echo esc_attr($product_id); ?>"
-                        style="<?php echo $is_variable ? '' : 'visibility:hidden;'; ?>">
+                        style="<?php echo $is_variable ? '' : 'visibility:hidden; pointer-events:none;'; ?>">
                     <span class="dashicons dashicons-plus-alt"></span>
                 </button>
-                <strong><?php echo esc_html($product->get_name()); ?></strong>
-                <span class="wc-pm-product-id">#<?php echo esc_html($product_id); ?></span>
+                <div class="wc-pm-product-info">
+                    <strong><?php echo esc_html($product->get_name()); ?></strong>
+                    <span class="wc-pm-product-id">#<?php echo esc_html($product_id); ?></span>
+                </div>
                 <?php if ($is_variable): ?>
-                    <span class="wc-pm-badge wc-pm-badge-variable"><?php echo esc_html__('Variable', 'wc-promotions-manager'); ?></span>
+                    <span class="wc-pm-badge wc-pm-badge-variable"><?php echo esc_html(count($product->get_children())); ?> var.</span>
                 <?php endif; ?>
             </td>
             <td><?php echo esc_html($this->get_promotion_type_label($promo_data['type'])); ?></td>
@@ -327,7 +350,7 @@ class WC_Promotions_Manager {
                     <?php esc_html_e('Activa', 'wc-promotions-manager'); ?>
                 </span>
             </td>
-            <td>
+            <td class="wc-pm-actions-cell">
                 <a href="<?php echo esc_url(get_edit_post_link($product_id)); ?>" class="button button-small" target="_blank" title="<?php esc_attr_e('Editar producto', 'wc-promotions-manager'); ?>">
                     <span class="dashicons dashicons-admin-post"></span>
                 </a>
@@ -375,28 +398,40 @@ class WC_Promotions_Manager {
         return sprintf(_n('%d hora', '%d horas', $hours, 'wc-promotions-manager'), $hours);
     }
 
+    /**
+     * FIXED: Now properly finds variable products by checking variants for sale prices
+     */
     public function get_active_promotions() {
         $args = array(
-            'post_type' => 'product',
+            'post_type' => array('product', 'product_variation'),
             'posts_per_page' => -1,
             'post_status' => 'publish',
             'meta_query' => array(
                 array(
                     'key' => '_sale_price',
                     'value' => '',
-                    'compare' => '!='
+                    'compare' => '!=',
                 )
             )
         );
 
-        $products = get_posts($args);
+        $products_and_variations = get_posts($args);
         $promotions = array();
         $now = current_time('timestamp');
 
-        foreach ($products as $product) {
-            $wc_product = wc_get_product($product->ID);
+        foreach ($products_and_variations as $post) {
+            $wc_product = wc_get_product($post->ID);
 
-            if (!$wc_product || !$wc_product->is_on_sale()) {
+            if (!$wc_product) continue;
+
+            // Handle variations: bubble up to parent variable product
+            if ($wc_product->is_type('variation')) {
+                $parent_id = $wc_product->get_parent_id();
+                // We'll handle variations separately via AJAX loading
+                continue;
+            }
+
+            if (!$wc_product->is_on_sale()) {
                 continue;
             }
 
@@ -411,30 +446,66 @@ class WC_Promotions_Manager {
                 continue;
             }
 
-            $regular_price = (float) $wc_product->get_regular_price();
-            $sale_price = (float) $wc_product->get_sale_price();
-
-            if ($regular_price <= 0 || $sale_price <= 0) {
-                continue;
-            }
-
-            $discount_percent = round((($regular_price - $sale_price) / $regular_price) * 100, 2);
-
             if ($wc_product->is_type('variable')) {
-                $min_regular = $wc_product->get_variation_regular_price('min', true);
-                $min_sale = $wc_product->get_variation_sale_price('min', true);
-                $var_discount = $min_regular > 0 ? round((($min_regular - $min_sale) / $min_regular) * 100, 2) : 0;
-                
-                $promotions[$product->ID] = array(
+                // For variable products, check if ANY variant has an active sale
+                $variants = $wc_product->get_children();
+                $has_active_variant = false;
+                $min_regular = PHP_FLOAT_MAX;
+                $min_sale = 0;
+                $max_discount = 0;
+
+                foreach ($variants as $variant_id) {
+                    $variant = wc_get_product($variant_id);
+                    if (!$variant) continue;
+
+                    $var_sale = $variant->get_sale_price();
+                    $var_regular = $variant->get_regular_price();
+
+                    if (empty($var_sale) || $var_sale <= 0) continue;
+
+                    // Check variant dates
+                    $var_date_from = $variant->get_date_on_sale_from();
+                    $var_date_to = $variant->get_date_on_sale_to();
+
+                    if ($var_date_from && strtotime($var_date_from) > $now) continue;
+                    if ($var_date_to && strtotime($var_date_to) < $now) continue;
+
+                    $has_active_variant = true;
+
+                    $var_regular_float = (float) $var_regular;
+                    $var_sale_float = (float) $var_sale;
+
+                    if ($var_regular_float < $min_regular) $min_regular = $var_regular_float;
+                    if ($var_sale_float < $min_sale || $min_sale === 0) $min_sale = $var_sale_float;
+
+                    if ($var_regular_float > 0) {
+                        $var_discount = round((($var_regular_float - $var_sale_float) / $var_regular_float) * 100, 2);
+                        if ($var_discount > $max_discount) $max_discount = $var_discount;
+                    }
+                }
+
+                if (!$has_active_variant) continue;
+
+                $promotions[$post->ID] = array(
                     'type' => 'variable',
-                    'regular_price' => $min_regular,
+                    'regular_price' => $min_regular === PHP_FLOAT_MAX ? 0 : $min_regular,
                     'sale_price' => $min_sale,
-                    'discount_percent' => $var_discount,
+                    'discount_percent' => $max_discount,
                     'date_from' => $date_from ? $date_from->date('Y-m-d H:i:s') : null,
                     'date_to' => $date_to ? $date_to->date('Y-m-d H:i:s') : null,
                 );
             } else {
-                $promotions[$product->ID] = array(
+                // Simple products
+                $regular_price = (float) $wc_product->get_regular_price();
+                $sale_price = (float) $wc_product->get_sale_price();
+
+                if ($regular_price <= 0 || $sale_price <= 0) {
+                    continue;
+                }
+
+                $discount_percent = round((($regular_price - $sale_price) / $regular_price) * 100, 2);
+
+                $promotions[$post->ID] = array(
                     'type' => 'simple',
                     'regular_price' => $regular_price,
                     'sale_price' => $sale_price,
@@ -509,7 +580,7 @@ class WC_Promotions_Manager {
 
         $lines = array_filter(array_map('trim', file(WC_PM_LOG_FILE)));
         $entries = array_reverse($lines);
-        $entries = array_slice($entries, 0, 10); // Last 10 entries
+        $entries = array_slice($entries, 0, 10);
 
         if (empty($entries)) {
             echo '<p class="wc-pm-no-activity">' . esc_html__('No hay actividad registrada aún.', 'wc-promotions-manager') . '</p>';
@@ -633,13 +704,15 @@ class WC_Promotions_Manager {
         }
 
         $product_id = intval($_POST['product_id']);
+        $variant_id = isset($_POST['variant_id']) ? intval($_POST['variant_id']) : 0;
+        $target_id = $variant_id > 0 ? $variant_id : $product_id;
         $new_price = isset($_POST['new_price']) ? floatval($_POST['new_price']) : null;
 
         if ($new_price === null || $new_price < 0) {
             wp_send_json_error(array('message' => __('Precio inválido', 'wc-promotions-manager')));
         }
 
-        $product = wc_get_product($product_id);
+        $product = wc_get_product($target_id);
         if (!$product) {
             wp_send_json_error(array('message' => __('Producto no encontrado', 'wc-promotions-manager')));
         }
@@ -652,7 +725,7 @@ class WC_Promotions_Manager {
         $product->save();
 
         $this->log_action('price_update', array(
-            'product_id' => $product_id,
+            'product_id' => $target_id,
             'product_name' => $product->get_name(),
             'old_price' => $old_price,
             'new_price' => $new_price,
@@ -678,7 +751,6 @@ class WC_Promotions_Manager {
         ob_start();
         $output = fopen('php://output', 'w');
         
-        // UTF-8 BOM for Excel
         fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
         
         fputcsv($output, array('ID', 'Producto', 'Tipo', 'Precio Normal', 'Precio Promo', 'Descuento %', 'Inicio', 'Fin', 'Estado'));
@@ -767,24 +839,12 @@ class WC_Promotions_Manager {
         if (empty($variants)) {
             $html = '<p>' . esc_html__('No hay variantes disponibles', 'wc-promotions-manager') . '</p>';
         } else {
-            $html = '<table class="wc-pm-variants-table">';
-            $html .= '<thead><tr>';
-            $html .= '<th><input type="checkbox" class="wc-pm-select-variants-all" data-parent-id="' . esc_attr($product_id) . '"></th>';
-            $html .= '<th>' . esc_html__('Variante', 'wc-promotions-manager') . '</th>';
-            $html .= '<th>' . esc_html__('Precio Normal', 'wc-promotions-manager') . '</th>';
-            $html .= '<th>' . esc_html__('Precio Promo', 'wc-promotions-manager') . '</th>';
-            $html .= '<th>' . esc_html__('Descuento %', 'wc-promotions-manager') . '</th>';
-            $html .= '<th>' . esc_html__('Inicio', 'wc-promotions-manager') . '</th>';
-            $html .= '<th>' . esc_html__('Fin', 'wc-promotions-manager') . '</th>';
-            $html .= '<th>' . esc_html__('Acciones', 'wc-promotions-manager') . '</th>';
-            $html .= '</tr></thead><tbody>';
+            $html = '<div class="wc-pm-variants-grid">';
 
             foreach ($variants as $variant_id) {
                 $variant = wc_get_product($variant_id);
 
-                if (!$variant) {
-                    continue;
-                }
+                if (!$variant) continue;
 
                 $sale_price = $variant->get_sale_price();
                 $has_promo = !empty($sale_price) && $variant->is_on_sale();
@@ -811,33 +871,40 @@ class WC_Promotions_Manager {
                     $discount_percent = round((($regular_price - $current_sale_price) / $regular_price) * 100, 2);
                 }
 
-                $html .= '<tr class="' . ($is_active ? 'wc-pm-active-promo' : '') . '" data-variant-id="' . esc_attr($variant_id) . '">';
-                $html .= '<td><input type="checkbox" class="wc-pm-select-variant" data-variant-id="' . esc_attr($variant_id) . '" data-parent-id="' . esc_attr($product_id) . '" ' . ($is_active ? '' : 'disabled') . '></td>';
-                $html .= '<td><strong>' . esc_html(wc_get_formatted_variation($variant, true)) . '</strong></td>';
-                $html .= '<td>' . wc_price($regular_price) . '</td>';
-                $html .= '<td class="wc-pm-price wc-pm-sale-price">';
+                $variant_name = wc_get_formatted_variation($variant, true);
+                $image = $this->get_product_image_html($variant_id, '48');
+
+                $html .= '<div class="wc-pm-variant-card' . ($is_active ? ' wc-pm-active-promo' : '') . '" data-variant-id="' . esc_attr($variant_id) . '">';
+                $html .= '<div class="wc-pm-variant-header">';
+                $html .= '<div class="wc-pm-variant-thumb">' . $image . '</div>';
+                $html .= '<div class="wc-pm-variant-name"><strong>' . esc_html($variant_name) . '</strong></div>';
+                $html .= '<div class="wc-pm-variant-check"><input type="checkbox" class="wc-pm-select-variant" data-variant-id="' . esc_attr($variant_id) . '" data-parent-id="' . esc_attr($product_id) . '" ' . ($is_active ? '' : 'disabled') . '></div>';
+                $html .= '</div>';
+                
+                $html .= '<div class="wc-pm-variant-prices">';
+                $html .= '<span class="wc-pm-variant-regular">' . wc_price($regular_price) . '</span>';
                 if ($current_sale_price > 0) {
-                    $html .= '<span class="wc-pm-editable" data-field="sale_price" data-variant-id="' . esc_attr($variant_id) . '" data-product-id="' . esc_attr($product_id) . '" data-value="' . esc_attr($current_sale_price) . '">' . wc_price($current_sale_price) . '</span>';
-                    $html .= '<span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>';
+                    $html .= '<span class="wc-pm-variant-sale">' . wc_price($current_sale_price) . '</span>';
+                    $html .= '<span class="wc-pm-discount-percent wc-pm-variant-discount">-' . esc_html($discount_percent) . '%</span>';
                 } else {
-                    $html .= '—';
+                    $html .= '<span class="wc-pm-no-promo">' . esc_html__('Sin promo', 'wc-promotions-manager') . '</span>';
                 }
-                $html .= '</td>';
-                $html .= '<td>' . ($discount_percent > 0 ? '<span class="wc-pm-discount-percent">-' . esc_html($discount_percent) . '%</span>' : '—') . '</td>';
-                $html .= '<td>' . esc_html($date_from ? date_i18n('d/m/Y', strtotime($date_from)) : '—') . '</td>';
-                $html .= '<td>' . esc_html($date_to ? date_i18n('d/m/Y', strtotime($date_to)) : '—') . '</td>';
-                $html .= '<td>';
+                $html .= '</div>';
+
+                $html .= '<div class="wc-pm-variant-dates">';
+                $html .= '<span>' . esc_html($date_from ? date_i18n('d/m/Y', strtotime($date_from)) : '—') . '</span>';
+                $html .= '<span class="wc-pm-sep">→</span>';
+                $html .= '<span>' . esc_html($date_to ? date_i18n('d/m/Y', strtotime($date_to)) : '—') . '</span>';
+                $html .= '</div>';
 
                 if ($is_active) {
-                    $html .= '<button class="button button-small button-danger wc-pm-delist-variant-btn" data-variant-id="' . esc_attr($variant_id) . '" data-parent-id="' . esc_attr($product_id) . '" title="' . esc_attr__('Delistar', 'wc-promotions-manager') . '"><span class="dashicons dashicons-trash"></span></button>';
-                } else {
-                    $html .= '<span class="wc-pm-no-promo">' . esc_html__('Sin promo activa', 'wc-promotions-manager') . '</span>';
+                    $html .= '<button class="button button-small button-danger wc-pm-delist-variant-btn" data-variant-id="' . esc_attr($variant_id) . '" data-parent-id="' . esc_attr($product_id) . '"><span class="dashicons dashicons-trash"></span></button>';
                 }
 
-                $html .= '</td></tr>';
+                $html .= '</div>';
             }
 
-            $html .= '</tbody></table>';
+            $html .= '</div>';
         }
 
         wp_send_json_success(array('html' => $html));
