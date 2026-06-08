@@ -1,6 +1,21 @@
-# WooCommerce Promotions Manager
+# WooCommerce Promotions Manager v2.0
 
-Un plugin de WordPress/WooCommerce que permite gestionar promociones activas de manera eficiente.
+Un plugin de WordPress/WooCommerce moderno y completo para gestionar promociones activas de manera eficiente.
+
+## ✨ Novedades v2.0
+
+- 📊 **Dashboard con estadísticas** - Total de promos activas, descuento promedio, promos por expirar, ahorro total
+- 🔍 **Búsqueda en vivo** - Filtra productos por nombre instantáneamente
+- 📅 **Filtros avanzados** - Por tipo de producto y rango de fechas
+- 📥 **Exportar a CSV** - Descarga un reporte completo de todas las promociones
+- ⚡ **Bulk Actions** - Selecciona múltiples productos y delistalos en masa
+- ✏️ **Edición inline de precios** - Modifica el precio de promo directamente desde la tabla
+- 📝 **Historial de actividad** - Log de todas las acciones realizadas (delistados, cambios de precio)
+- ⏰ **Tiempo restante** - Indicador visual de cuánto queda para que expire cada promo
+- 🎨 **UI moderna** - Cards con gradientes, animaciones suaves, notificaciones toast
+- 📱 **Responsive** - Diseño adaptativo para móvil, tablet y desktop
+- 📄 **Paginación** - Navegación fluida cuando hay muchas promociones
+- 🔔 **Modales de confirmación** - Confirmaciones elegantes antes de acciones destructivas
 
 ## Características
 
@@ -24,10 +39,36 @@ Un plugin de WordPress/WooCommerce que permite gestionar promociones activas de 
 
 ## Uso
 
-1. Navega a **WooCommerce → Promociones WC** en el panel de administración.
-2. Verás una lista de todos los productos con promociones activas.
-3. Para productos variables, haz clic en el botón **+** para desplegar las variantes.
-4. Haz clic en **Delistar** para remover la promoción de un producto o variante.
+### Dashboard Principal
+
+Al navegar a **WooCommerce → Promociones WC**, verás:
+
+1. **Cards de estadísticas** - Resumen rápido del estado de tus promociones
+2. **Barra de herramientas** - Búsqueda, filtros y acciones
+3. **Tabla de promociones** - Lista detallada con todas las promos activas
+4. **Historial de actividad** - Log de acciones recientes
+
+### Acciones Disponibles
+
+| Acción | Cómo usarla |
+|--------|-------------|
+| **Buscar** | Escribí en el campo de búsqueda para filtrar por nombre |
+| **Filtrar por tipo** | Seleccioná "Simple" o "Variable" en el dropdown |
+| **Filtrar por fecha** | Usá los campos de fecha "desde" y "hasta" |
+| **Editar precio** | Hacé clic en el precio de promo, editá y presioná Enter |
+| **Delistar individual** | Clic en el botón 🗑️ de la fila |
+| **Delistar masivo** | Seleccioná los checkboxes y clic en "Delistar seleccionados" |
+| **Exportar CSV** | Clic en "Exportar CSV" para descargar el reporte |
+| **Ver variantes** | Clic en el botón **+** de productos variables |
+| **Editar producto** | Clic en el ícono de documento para ir al editor de WP |
+
+### Productos Variables
+
+Los productos variables aparecen comprimidos en una sola fila. Al hacer clic en el botón de desplegar:
+- Se muestran todas las variantes con sus respectivas promociones
+- Cada variante muestra su información individual de precios y fechas
+- Podés delistar promociones de variantes específicas sin afectar a las demás
+- Los precios de variantes también son editables inline
 
 ## Estructura de Archivos
 
@@ -36,40 +77,69 @@ wc-promotions-manager/
 ├── wc-promotions-manager.php    # Archivo principal del plugin
 ├── assets/
 │   ├── css/
-│   │   └── admin.css            # Estilos del panel de administración
+│   │   └── admin.css            # Estilos modernos del panel
 │   └── js/
-│       └── admin.js             # JavaScript para interacciones AJAX
+│       └── admin.js             # JavaScript con toasts, modales, inline edit
+├── activity.log                 # Log de actividad (auto-generado)
 └── README.md                    # Este archivo
 ```
 
 ## Funcionalidades Detalladas
 
 ### Listado Principal
-- Producto (nombre y tipo)
+- Checkbox para selección múltiple
+- Producto (nombre, ID y tipo)
 - Precio normal
-- Precio de promoción
-- Porcentaje de descuento
-- Fecha de inicio
-- Fecha de finalización
-- Estado de la promoción
+- Precio de promoción (editable inline)
+- Porcentaje de descuento (badge con color según magnitud)
+- Fecha de inicio y finalización
+- Tiempo restante con indicador de expiración próxima
+- Estado de la promoción con dot animado
+- Acceso directo al editor de producto
 - Botón de delistado
 
-### Productos Variables
-Los productos variables aparecen comprimidos en una sola fila. Al hacer clic en el botón de desplegar:
-- Se muestran todas las variantes con sus respectivas promociones
-- Cada variante muestra su información individual de precios y fechas
-- Puedes delistar promociones de variantes específicas sin afectar a las demás
+### Dashboard de Estadísticas
+- **Promociones Activas** - Total count
+- **Descuento Promedio** - Media de todos los descuentos
+- **Expiran en 7 días** - Alerta de promos próximas a vencer
+- **Ahorro Total Cliente** - Suma de diferencias entre precio normal y promo
+
+### Bulk Actions
+- Selección individual con checkboxes
+- "Seleccionar todos" con checkbox header
+- Contador de seleccionados en el botón
+- Modal de confirmación antes de ejecutar
+- Remoción animada de filas procesadas
+
+### Edición Inline de Precios
+- Clic en cualquier precio de promo para editar
+- Input numérico con validación
+- Guardado automático al presionar Enter o salir del campo
+- Cancelar con Escape
+- Actualización en tiempo real del % de descuento
+- Toast de confirmación
+
+### Historial de Actividad
+- Log persistente en archivo `activity.log`
+- Muestra: acción, detalle, usuario, tiempo relativo
+- Últimas 10 acciones visibles
+- Tipos de acción: delist, bulk_delist, price_update, variant_toggle
 
 ### AJAX Actions
 - `wc_pm_delist_promotion`: Remueve el precio de oferta de un producto o variante
+- `wc_pm_bulk_delist`: Delistado masivo de múltiples productos
+- `wc_pm_update_sale_price`: Actualiza el precio de promo inline
 - `wc_pm_get_product_variants`: Obtiene y renderiza las variantes de un producto variable
 - `wc_pm_toggle_variant_promo`: Habilita/deshabilita promoción de una variante
+- `wc_pm_export_csv`: Genera y descarga CSV de todas las promos
+- `wc_pm_get_stats`: Obtiene estadísticas actualizadas
 
 ## Seguridad
 
 - Verificación de nonces en todas las solicitudes AJAX
 - Validación de permisos de usuario (solo usuarios con `manage_woocommerce`)
 - Sanitización y escape de todos los datos de entrada y salida
+- CSV export con BOM UTF-8 para compatibilidad con Excel
 
 ## Traducción
 
@@ -84,6 +154,23 @@ Para reportar errores o solicitar funcionalidades, por favor crea un issue en el
 GPL v2 o posterior
 
 ## Changelog
+
+### 2.0.0
+- Dashboard con estadísticas en tiempo real
+- Búsqueda y filtros avanzados
+- Exportación a CSV
+- Bulk actions (delistado masivo)
+- Edición inline de precios de promo
+- Historial de actividad con log persistente
+- Tiempo restante con indicador visual
+- UI completamente rediseñada (cards, gradientes, animaciones)
+- Notificaciones toast modernas
+- Modales de confirmación elegantes
+- Paginación para grandes volúmenes de datos
+- Acceso directo al editor de producto
+- IDs de producto visibles
+- Badges de descuento con colores dinámicos
+- Indicador de promos próximas a expirar
 
 ### 1.0.0
 - Versión inicial
