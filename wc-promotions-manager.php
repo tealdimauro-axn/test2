@@ -306,19 +306,21 @@ class WC_Promotions_Manager {
                 <input type="checkbox" class="wc-pm-select-item" data-product-id="<?php echo esc_attr($product_id); ?>">
             </td>
             <td class="column-primary">
-                <?php echo $this->get_product_image_html($product_id); ?>
-                <button class="toggle-variants button-link"
-                        data-product-id="<?php echo esc_attr($product_id); ?>"
-                        style="<?php echo $is_variable ? '' : 'visibility:hidden; pointer-events:none;'; ?>">
-                    <span class="dashicons dashicons-plus-alt"></span>
-                </button>
-                <div class="wc-pm-product-info">
-                    <strong><?php echo esc_html($product->get_name()); ?></strong>
-                    <span class="wc-pm-product-id">#<?php echo esc_html($product_id); ?></span>
+                <div class="wc-pm-cell-content">
+                    <?php echo $this->get_product_image_html($product_id); ?>
+                    <button class="toggle-variants button-link"
+                            data-product-id="<?php echo esc_attr($product_id); ?>"
+                            style="<?php echo $is_variable ? '' : 'visibility:hidden; pointer-events:none;'; ?>">
+                        <span class="dashicons dashicons-plus-alt"></span>
+                    </button>
+                    <div class="wc-pm-product-info">
+                        <strong><?php echo esc_html($product->get_name()); ?></strong>
+                        <span class="wc-pm-product-id">#<?php echo esc_html($product_id); ?></span>
+                    </div>
+                    <?php if ($is_variable): ?>
+                        <span class="wc-pm-badge wc-pm-badge-variable"><?php echo esc_html(count($product->get_children())); ?> var.</span>
+                    <?php endif; ?>
                 </div>
-                <?php if ($is_variable): ?>
-                    <span class="wc-pm-badge wc-pm-badge-variable"><?php echo esc_html(count($product->get_children())); ?> var.</span>
-                <?php endif; ?>
             </td>
             <td><?php echo esc_html($this->get_promotion_type_label($promo_data['type'])); ?></td>
             <td class="wc-pm-price"><?php echo wc_price($promo_data['regular_price']); ?></td>
