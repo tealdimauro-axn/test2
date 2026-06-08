@@ -399,52 +399,24 @@ class WC_Promotions_Manager {
     }
 
     /**
-     * FIXED: Now properly finds variable products by checking variants for sale prices
+     * FIXED: Query ALL products (no meta_query), filter in PHP.
+     * Variable products don't have _sale_price at parent level, so meta_query excluded them.
      */
     public function get_active_promotions() {
+        // Query ALL products — we filter for sales in PHP
         $args = array(
-            'post_type' => array('product', 'product_variation'),
+            'post_type' => 'product',
             'posts_per_page' => -1,
             'post_status' => 'publish',
-            'meta_query' => array(
-                array(
-                    'key' => '_sale_price',
-                    'value' => '',
-                    'compare' => '!=',
-                )
-            )
         );
 
-        $products_and_variations = get_posts($args);
+        $products = get_posts($args);
         $promotions = array();
         $now = current_time('timestamp');
 
-        foreach ($products_and_variations as $post) {
+        foreach ($products as $post) {
             $wc_product = wc_get_product($post->ID);
-
             if (!$wc_product) continue;
-
-            // Handle variations: bubble up to parent variable product
-            if ($wc_product->is_type('variation')) {
-                $parent_id = $wc_product->get_parent_id();
-                // We'll handle variations separately via AJAX loading
-                continue;
-            }
-
-            if (!$wc_product->is_on_sale()) {
-                continue;
-            }
-
-            $date_from = $wc_product->get_date_on_sale_from();
-            $date_to = $wc_product->get_date_on_sale_to();
-
-            if ($date_from && strtotime($date_from) > $now) {
-                continue;
-            }
-
-            if ($date_to && strtotime($date_to) < $now) {
-                continue;
-            }
 
             if ($wc_product->is_type('variable')) {
                 // For variable products, check if ANY variant has an active sale
@@ -453,6 +425,8 @@ class WC_Promotions_Manager {
                 $min_regular = PHP_FLOAT_MAX;
                 $min_sale = 0;
                 $max_discount = 0;
+                $variant_date_from = null;
+                $variant_date_to = null;
 
                 foreach ($variants as $variant_id) {
                     $variant = wc_get_product($variant_id);
@@ -461,7 +435,7 @@ class WC_Promotions_Manager {
                     $var_sale = $variant->get_sale_price();
                     $var_regular = $variant->get_regular_price();
 
-                    if (empty($var_sale) || $var_sale <= 0) continue;
+                    if (empty($var_sale) || (float)$var_sale <= 0) continue;
 
                     // Check variant dates
                     $var_date_from = $variant->get_date_on_sale_from();
@@ -475,33 +449,61 @@ class WC_Promotions_Manager {
                     $var_regular_float = (float) $var_regular;
                     $var_sale_float = (float) $var_sale;
 
-                    if ($var_regular_float < $min_regular) $min_regular = $var_regular_float;
-                    if ($var_sale_float < $min_sale || $min_sale === 0) $min_sale = $var_sale_float;
+                    if ($var_regular_float > 0 && $var_regular_float < $min_regular) {
+                        $min_regular = $var_regular_float;
+                    }
+                    if ($var_sale_float > 0 && ($min_sale == 0 || $var_sale_float < $min_sale)) {
+                        $min_sale = $var_sale_float;
+                    }
 
                     if ($var_regular_float > 0) {
                         $var_discount = round((($var_regular_float - $var_sale_float) / $var_regular_float) * 100, 2);
                         if ($var_discount > $max_discount) $max_discount = $var_discount;
                     }
+
+                    // Track the earliest date range among active variants
+                    if ($var_date_from) {
+                        $ts = strtotime($var_date_from);
+                        if (!$variant_date_from || $ts < strtotime($variant_date_from)) {
+                            $variant_date_from = $var_date_from;
+                        }
+                    }
+                    if ($var_date_to) {
+                        $ts = strtotime($var_date_to);
+                        if (!$variant_date_to || $ts > strtotime($variant_date_to)) {
+                            $variant_date_to = $var_date_to;
+                        }
+                    }
                 }
 
                 if (!$has_active_variant) continue;
+
+                // Use parent dates if set, otherwise variant dates
+                $parent_date_from = $wc_product->get_date_on_sale_from();
+                $parent_date_to = $wc_product->get_date_on_sale_to();
 
                 $promotions[$post->ID] = array(
                     'type' => 'variable',
                     'regular_price' => $min_regular === PHP_FLOAT_MAX ? 0 : $min_regular,
                     'sale_price' => $min_sale,
                     'discount_percent' => $max_discount,
-                    'date_from' => $date_from ? $date_from->date('Y-m-d H:i:s') : null,
-                    'date_to' => $date_to ? $date_to->date('Y-m-d H:i:s') : null,
+                    'date_from' => $parent_date_from ? $parent_date_from->date('Y-m-d H:i:s') : ($variant_date_from ? $variant_date_from->date('Y-m-d H:i:s') : null),
+                    'date_to' => $parent_date_to ? $parent_date_to->date('Y-m-d H:i:s') : ($variant_date_to ? $variant_date_to->date('Y-m-d H:i:s') : null),
                 );
             } else {
-                // Simple products
+                // Simple / grouped / external products
+                if (!$wc_product->is_on_sale()) continue;
+
+                $date_from = $wc_product->get_date_on_sale_from();
+                $date_to = $wc_product->get_date_on_sale_to();
+
+                if ($date_from && strtotime($date_from) > $now) continue;
+                if ($date_to && strtotime($date_to) < $now) continue;
+
                 $regular_price = (float) $wc_product->get_regular_price();
                 $sale_price = (float) $wc_product->get_sale_price();
 
-                if ($regular_price <= 0 || $sale_price <= 0) {
-                    continue;
-                }
+                if ($regular_price <= 0 || $sale_price <= 0) continue;
 
                 $discount_percent = round((($regular_price - $sale_price) / $regular_price) * 100, 2);
 
