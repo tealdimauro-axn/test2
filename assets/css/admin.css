@@ -1,0 +1,177 @@
+/**
+ * WooCommerce Promotions Manager - Admin Styles
+ */
+
+.wc-pm-container {
+    max-width: 1400px;
+}
+
+.wc-pm-table-wrapper {
+    margin-top: 20px;
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.wc-pm-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.wc-pm-table th,
+.wc-pm-table td {
+    padding: 12px 10px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.wc-pm-table th {
+    font-weight: 600;
+    color: #23282d;
+    background: #f9f9f9;
+    border-bottom: 2px solid #ccd0d4;
+}
+
+.wc-pm-table tbody tr:hover {
+    background: #f0f6fc;
+}
+
+.wc-pm-variable-product {
+    background: #fffbcc;
+}
+
+.wc-pm-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: #fff;
+    background: #2271b1;
+    border-radius: 2px;
+    margin-left: 8px;
+    text-transform: uppercase;
+}
+
+.wc-pm-discount-percent {
+    display: inline-block;
+    padding: 4px 8px;
+    font-weight: 600;
+    color: #fff;
+    background: #00a32a;
+    border-radius: 3px;
+}
+
+.wc-pm-status {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 3px;
+}
+
+.wc-pm-status-active {
+    color: #00a32a;
+    background: #e8f5e9;
+}
+
+.wc-pm-status-inactive {
+    color: #d63638;
+    background: #fbeaea;
+}
+
+.button-danger {
+    color: #d63638 !important;
+    border-color: #d63638 !important;
+}
+
+.button-danger:hover {
+    background: #d63638 !important;
+    color: #fff !important;
+}
+
+.toggle-variants {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-right: 5px;
+    color: #2271b1;
+    transition: transform 0.2s ease;
+}
+
+.toggle-variants:hover {
+    color: #135e96;
+}
+
+.toggle-variants.active .dashicons-plus-alt:before {
+    content: "\f153";
+}
+
+.wc-pm-variants-row {
+    background: #f9f9f9;
+}
+
+.wc-pm-variants-container {
+    padding: 15px;
+}
+
+.wc-pm-variants-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.wc-pm-variants-table th,
+.wc-pm-variants-table td {
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.wc-pm-variants-table th {
+    font-weight: 600;
+    color: #555;
+    background: #f1f1f1;
+}
+
+.wc-pm-variants-table tbody tr:hover {
+    background: #fff;
+}
+
+.wc-pm-variants-table .wc-pm-active-promo {
+    background: #e8f5e9;
+}
+
+.wc-pm-no-promo {
+    color: #666;
+    font-style: italic;
+}
+
+.wc-pm-loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.wc-pm-delist-btn,
+.wc-pm-delist-variant-btn {
+    font-size: 12px;
+    padding: 4px 12px;
+}
+
+.notice wc-pm-notice {
+    margin: 20px 0;
+}
+
+@media screen and (max-width: 1024px) {
+    .wc-pm-table {
+        font-size: 13px;
+    }
+    
+    .wc-pm-table th,
+    .wc-pm-table td {
+        padding: 8px 6px;
+    }
+}
