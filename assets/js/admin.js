@@ -327,36 +327,57 @@
         });
 
         // ==========================================
-        // Inline Price Editing
+        // Inline Price Editing with Percentage Sync
         // ==========================================
         $(document).on('click', '.wc-pm-editable', function(e) {
             e.stopPropagation();
-            
+
             var $editable = $(this);
             if ($editable.find('input').length > 0) return;
 
-            var currentValue = $editable.data('value');
-            var currentFormatted = $editable.text().trim();
+            var regularPrice = parseFloat($editable.data('regular-price')) || 0;
+            var currentValue = parseFloat($editable.data('value')) || 0;
+            var currentPercent = regularPrice > 0 ? ((regularPrice - currentValue) / regularPrice * 100).toFixed(2) : 0;
             var productId = $editable.data('product-id') || '';
             var variantId = $editable.data('variant-id') || '';
-            var targetId = variantId || productId;
             var field = $editable.data('field');
+            var currentFormatted = $editable.text().trim();
 
-            var $input = $(`<input type="number" step="0.01" min="0" class="wc-pm-edit-input" value="${currentValue}">`);
-            
-            $editable.empty().append($input);
-            $input.focus().select();
+            var $wrapper = $('<div class="wc-pm-edit-wrapper"></div>');
+            var $priceInput = $(`<input type="number" step="0.01" min="0" class="wc-pm-edit-input-price" value="${currentValue}" placeholder="Precio">`);
+            var $percentInput = $(`<input type="number" step="0.01" min="0" max="100" class="wc-pm-edit-input-percent" value="${currentPercent}" placeholder="%">`);
+
+            $wrapper.append($priceInput).append('<span class="wc-pm-edit-sep">%</span>').append($percentInput);
+            $editable.empty().append($wrapper);
+            $priceInput.focus().select();
+
+            // Sync inputs
+            $priceInput.on('input', function() {
+                var p = parseFloat($(this).val());
+                if (regularPrice > 0 && !isNaN(p)) {
+                    var pct = ((regularPrice - p) / regularPrice * 100).toFixed(2);
+                    $percentInput.val(pct >= 0 ? pct : 0);
+                }
+            });
+
+            $percentInput.on('input', function() {
+                var pct = parseFloat($(this).val());
+                if (regularPrice > 0 && !isNaN(pct)) {
+                    var p = regularPrice - (regularPrice * (pct / 100));
+                    $priceInput.val(p >= 0 ? p.toFixed(2) : 0);
+                }
+            });
 
             function savePrice() {
-                var newValue = parseFloat($input.val());
-                
+                var newValue = parseFloat($priceInput.val());
+
                 if (isNaN(newValue) || newValue < 0) {
-                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}" data-regular-price="${regularPrice}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                     return;
                 }
 
                 if (newValue == currentValue) {
-                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}" data-regular-price="${regularPrice}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                     return;
                 }
 
@@ -374,35 +395,40 @@
                     },
                     success: function(response) {
                         if (response.success) {
-                            $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${newValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${response.data.new_price}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                            $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${newValue}" data-regular-price="${regularPrice}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${response.data.new_price}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                             showToast(response.data.message, 'success');
-                            
+
                             var $cardOrRow = $editable.closest('.wc-pm-variant-card, tr');
                             $cardOrRow.find('.wc-pm-discount-percent, .wc-pm-variant-discount').text('-' + response.data.new_discount + '%');
                         } else {
                             showToast(response.data.message || wcPmAjax.error, 'error');
-                            $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                            $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}" data-regular-price="${regularPrice}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                         }
                     },
                     error: function() {
                         showToast(wcPmAjax.error, 'error');
-                        $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                        $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}" data-regular-price="${regularPrice}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                     }
                 });
             }
 
-            $input.on('keydown', function(e) {
+            function handleKeydown(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     savePrice();
                 }
                 if (e.key === 'Escape') {
-                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
+                    $editable.html(`<span class="wc-pm-editable" data-field="${field}" data-product-id="${productId}" data-value="${currentValue}" data-regular-price="${regularPrice}"${variantId ? ' data-variant-id="'+variantId+'"' : ''}>${currentFormatted}</span><span class="wc-pm-edit-icon"><span class="dashicons dashicons-edit"></span></span>`);
                 }
-            });
+            }
 
-            $input.on('blur', function() {
-                setTimeout(savePrice, 200);
+            $priceInput.on('keydown', handleKeydown);
+            $percentInput.on('keydown', handleKeydown);
+
+            $wrapper.on('focusout', function(e) {
+                if (!$wrapper.has(e.relatedTarget).length) {
+                    setTimeout(savePrice, 200);
+                }
             });
         });
 
@@ -503,6 +529,115 @@
             var parentId = $(this).data('parent-id');
             var isChecked = $(this).prop('checked');
             $(`.wc-pm-select-variant[data-parent-id="${parentId}"]`).prop('checked', isChecked);
+        });
+
+        // ==========================================
+        // Create Promotion Modal Logic
+        // ==========================================
+        $('.wc-pm-create-promo-btn').on('click', function() {
+            $('#wc-pm-create-modal').addClass('active');
+        });
+
+        $('#wc-pm-create-modal .wc-pm-modal-cancel, #wc-pm-create-modal').on('click', function(e) {
+            if (e.target === this || $(e.target).hasClass('wc-pm-modal-cancel')) {
+                $('#wc-pm-create-modal').removeClass('active');
+            }
+        });
+
+        $('input[name="promo_target"]').on('change', function() {
+            if ($(this).val() === 'specific') {
+                $('textarea[name="promo_product_ids"]').show();
+            } else {
+                $('textarea[name="promo_product_ids"]').hide();
+            }
+        });
+
+        $('#wc-pm-create-modal .wc-pm-modal-confirm').on('click', function() {
+            var $btn = $(this);
+            var target = $('input[name="promo_target"]:checked').val();
+            var discountType = $('select[name="promo_discount_type"]').val();
+            var discountValue = $('input[name="promo_discount_value"]').val();
+            var dateFrom = $('input[name="promo_date_from"]').val();
+            var dateTo = $('input[name="promo_date_to"]').val();
+            var productIds = $('textarea[name="promo_product_ids"]').val();
+
+            if (!discountValue || discountValue < 0) {
+                showToast('Por favor ingrese un valor de descuento válido', 'error');
+                return;
+            }
+
+            $btn.prop('disabled', true).html('<span class="wc-pm-spinner" style="width:14px;height:14px;border-width:2px;"></span> Procesando...');
+
+            $.ajax({
+                url: wcPmAjax.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'wc_pm_create_promotions',
+                    nonce: wcPmAjax.nonce,
+                    use_filtered: target === 'filtered' ? 1 : 0,
+                    product_ids: productIds,
+                    discount_type: discountType,
+                    discount_value: discountValue,
+                    date_from: dateFrom,
+                    date_to: dateTo,
+                    search: $('[name="wc_pm_search"]').val(),
+                    type: $('[name="wc_pm_type"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        showToast(response.data.message, 'success');
+                        $('#wc-pm-create-modal').removeClass('active');
+                        setTimeout(() => refreshPage(), 500);
+                    } else {
+                        showToast(response.data.message || wcPmAjax.error, 'error');
+                    }
+                    $btn.prop('disabled', false).html('Aplicar Promoción');
+                },
+                error: function() {
+                    showToast(wcPmAjax.error, 'error');
+                    $btn.prop('disabled', false).html('Aplicar Promoción');
+                }
+            });
+        });
+
+        // ==========================================
+        // Delist Filtered Logic
+        // ==========================================
+        $('.wc-pm-delist-filtered-btn').on('click', function() {
+            showModal(
+                'Delistar promociones filtradas',
+                '¿Está seguro que desea delistar TODAS las promociones que coincidan con los filtros actuales? Esta acción no se puede deshacer.',
+                () => {
+                    var $btn = $('.wc-pm-delist-filtered-btn');
+                    $btn.prop('disabled', true).html('<span class="wc-pm-spinner" style="width:14px;height:14px;border-width:2px;"></span> Procesando...');
+
+                    $.ajax({
+                        url: wcPmAjax.ajaxUrl,
+                        type: 'POST',
+                        data: {
+                            action: 'wc_pm_bulk_delist_filtered',
+                            nonce: wcPmAjax.nonce,
+                            search: $('[name="wc_pm_search"]').val(),
+                            date_from: $('[name="wc_pm_date_from"]').val(),
+                            date_to: $('[name="wc_pm_date_to"]').val(),
+                            type: $('[name="wc_pm_type"]').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                showToast(response.data.message, 'success');
+                                setTimeout(() => refreshPage(), 500);
+                            } else {
+                                showToast(response.data.message || wcPmAjax.error, 'error');
+                            }
+                            $btn.prop('disabled', false).html('<span class="dashicons dashicons-trash"></span> Delistar Filtrados');
+                        },
+                        error: function() {
+                            showToast(wcPmAjax.error, 'error');
+                            $btn.prop('disabled', false).html('<span class="dashicons dashicons-trash"></span> Delistar Filtrados');
+                        }
+                    });
+                }
+            );
         });
 
         // ==========================================
