@@ -532,41 +532,167 @@
         });
 
         // ==========================================
-        // Create Promotion Modal Logic
+        // Builder View Logic (New Promotion Creator)
         // ==========================================
+        let selectedProducts = [];
+
         $('.wc-pm-create-promo-btn').on('click', function() {
-            $('#wc-pm-create-modal').addClass('active');
+            $('#wc-pm-dashboard-view').hide();
+            $('#wc-pm-builder-view').show();
         });
 
-        $('#wc-pm-create-modal .wc-pm-modal-cancel, #wc-pm-create-modal').on('click', function(e) {
-            if (e.target === this || $(e.target).hasClass('wc-pm-modal-cancel')) {
-                $('#wc-pm-create-modal').removeClass('active');
-            }
+        $('.wc-pm-back-to-dashboard').on('click', function() {
+            $('#wc-pm-builder-view').hide();
+            $('#wc-pm-dashboard-view').show();
+            // Reset builder state
+            selectedProducts = [];
+            renderSelectedProducts();
+            $('#wc-pm-product-search').val('');
+            $('#wc-pm-search-results').html('<p class="wc-pm-empty-state">Realice una búsqueda para ver productos.</p>');
         });
 
-        $('input[name="promo_target"]').on('change', function() {
-            if ($(this).val() === 'specific') {
-                $('textarea[name="promo_product_ids"]').show();
-            } else {
-                $('textarea[name="promo_product_ids"]').hide();
-            }
-        });
+        // Search Products
+        $('#wc-pm-search-btn').on('click', function() {
+            var searchQuery = $('#wc-pm-product-search').val().trim();
+            if (!searchQuery) return;
 
-        $('#wc-pm-create-modal .wc-pm-modal-confirm').on('click', function() {
             var $btn = $(this);
-            var target = $('input[name="promo_target"]:checked').val();
-            var discountType = $('select[name="promo_discount_type"]').val();
-            var discountValue = $('input[name="promo_discount_value"]').val();
-            var dateFrom = $('input[name="promo_date_from"]').val();
-            var dateTo = $('input[name="promo_date_to"]').val();
-            var productIds = $('textarea[name="promo_product_ids"]').val();
+            $btn.prop('disabled', true).html('<span class="wc-pm-spinner" style="width:14px;height:14px;border-width:2px;"></span>');
+
+            $.ajax({
+                url: wcPmAjax.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'wc_pm_search_products',
+                    nonce: wcPmAjax.nonce,
+                    search: searchQuery
+                },
+                success: function(response) {
+                    if (response.success) {
+                        renderSearchResults(response.data.results);
+                    } else {
+                        $('#wc-pm-search-results').html('<p class="wc-pm-empty-state">Error en la búsqueda.</p>');
+                    }
+                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-search"></span> Buscar');
+                },
+                error: function() {
+                    $('#wc-pm-search-results').html('<p class="wc-pm-empty-state">Error de conexión.</p>');
+                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-search"></span> Buscar');
+                }
+            });
+        });
+
+        $('#wc-pm-product-search').on('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                $('#wc-pm-search-btn').click();
+            }
+        });
+
+        function renderSearchResults(results) {
+            var $container = $('#wc-pm-search-results');
+            if (results.length === 0) {
+                $container.html('<p class="wc-pm-empty-state">No se encontraron productos.</p>');
+                return;
+            }
+
+            var html = '<div class="wc-pm-results-grid">';
+            results.forEach(function(product) {
+                var isAlreadySelected = selectedProducts.some(p => p.id === product.id);
+                html += `
+                    <div class="wc-pm-result-card" data-id="${product.id}">
+                        <img src="${product.image}" alt="${product.name}" class="wc-pm-result-img">
+                        <div class="wc-pm-result-info">
+                            <strong>${product.name}</strong>
+                            <span class="wc-pm-result-meta">ID: ${product.id} | SKU: ${product.sku || 'N/A'}</span>
+                            <span class="wc-pm-result-price">${wcPmAjax.currencySymbol || '$'}${product.price}</span>
+                        </div>
+                        <button class="button ${isAlreadySelected ? 'button-disabled' : 'wc-pm-add-product-btn'}" 
+                                data-id="${product.id}" 
+                                data-name="${product.name}"
+                                ${isAlreadySelected ? 'disabled' : ''}>
+                            ${isAlreadySelected ? 'Agregado' : 'Agregar'}
+                        </button>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            $container.html(html);
+        }
+
+        $(document).on('click', '.wc-pm-add-product-btn', function() {
+            var id = parseInt($(this).data('id'));
+            var name = $(this).data('name');
+            
+            if (!selectedProducts.some(p => p.id === id)) {
+                selectedProducts.push({ id: id, name: name });
+                renderSelectedProducts();
+                
+                // Update button state in search results
+                $(this).text('Agregado').prop('disabled', true).addClass('button-disabled');
+            }
+        });
+
+        function renderSelectedProducts() {
+            var $container = $('#wc-pm-selected-products');
+            $('.wc-pm-selected-count').text(selectedProducts.length);
+            
+            if (selectedProducts.length === 0) {
+                $container.html('<p class="wc-pm-empty-state">Agregue productos desde el buscador.</p>');
+                $('.wc-pm-apply-promo-btn').prop('disabled', true);
+                return;
+            }
+
+            $('.wc-pm-apply-promo-btn').prop('disabled', false);
+
+            var html = '<ul class="wc-pm-selected-list">';
+            selectedProducts.forEach(function(product) {
+                html += `
+                    <li class="wc-pm-selected-item" data-id="${product.id}">
+                        <span class="wc-pm-selected-name">${product.name}</span>
+                        <button class="wc-pm-remove-product-btn" data-id="${product.id}">
+                            <span class="dashicons dashicons-no-alt"></span>
+                        </button>
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            $container.html(html);
+        }
+
+        $(document).on('click', '.wc-pm-remove-product-btn', function() {
+            var id = parseInt($(this).data('id'));
+            selectedProducts = selectedProducts.filter(p => p.id !== id);
+            renderSelectedProducts();
+            
+            // Re-enable button in search results if it exists
+            var $searchBtn = $(`.wc-pm-add-product-btn[data-id="${id}"]`);
+            if ($searchBtn.length) {
+                $searchBtn.text('Agregar').prop('disabled', false).removeClass('button-disabled');
+            }
+        });
+
+        // Apply Promotion to Selected
+        $('.wc-pm-apply-promo-btn').on('click', function() {
+            var $btn = $(this);
+            var discountType = $('#wc-pm-discount-type').val();
+            var discountValue = $('#wc-pm-discount-value').val();
+            var dateFrom = $('#wc-pm-date-from').val();
+            var dateTo = $('#wc-pm-date-to').val();
 
             if (!discountValue || discountValue < 0) {
                 showToast('Por favor ingrese un valor de descuento válido', 'error');
                 return;
             }
 
-            $btn.prop('disabled', true).html('<span class="wc-pm-spinner" style="width:14px;height:14px;border-width:2px;"></span> Procesando...');
+            if (selectedProducts.length === 0) {
+                showToast('Debe seleccionar al menos un producto', 'error');
+                return;
+            }
+
+            $btn.prop('disabled', true).html('<span class="wc-pm-spinner" style="width:14px;height:14px;border-width:2px;"></span> Aplicando...');
+
+            var productIdsString = selectedProducts.map(p => p.id).join('\n');
 
             $.ajax({
                 url: wcPmAjax.ajaxUrl,
@@ -574,28 +700,26 @@
                 data: {
                     action: 'wc_pm_create_promotions',
                     nonce: wcPmAjax.nonce,
-                    use_filtered: target === 'filtered' ? 1 : 0,
-                    product_ids: productIds,
+                    use_filtered: 0, // We are passing specific IDs
+                    product_ids: productIdsString,
                     discount_type: discountType,
                     discount_value: discountValue,
                     date_from: dateFrom,
-                    date_to: dateTo,
-                    search: $('[name="wc_pm_search"]').val(),
-                    type: $('[name="wc_pm_type"]').val()
+                    date_to: dateTo
                 },
                 success: function(response) {
                     if (response.success) {
                         showToast(response.data.message, 'success');
-                        $('#wc-pm-create-modal').removeClass('active');
+                        $('.wc-pm-back-to-dashboard').click(); // Go back to dashboard
                         setTimeout(() => refreshPage(), 500);
                     } else {
                         showToast(response.data.message || wcPmAjax.error, 'error');
                     }
-                    $btn.prop('disabled', false).html('Aplicar Promoción');
+                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-yes-alt"></span> Aplicar Promoción a Seleccionados');
                 },
                 error: function() {
                     showToast(wcPmAjax.error, 'error');
-                    $btn.prop('disabled', false).html('Aplicar Promoción');
+                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-yes-alt"></span> Aplicar Promoción a Seleccionados');
                 }
             });
         });

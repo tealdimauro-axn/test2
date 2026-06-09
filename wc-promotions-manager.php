@@ -49,6 +49,7 @@ class WC_Promotions_Manager {
         add_action('wp_ajax_wc_pm_refresh_stats', array($this, 'ajax_refresh_stats'));
         add_action('wp_ajax_wc_pm_create_promotions', array($this, 'ajax_create_promotions'));
         add_action('wp_ajax_wc_pm_bulk_delist_filtered', array($this, 'ajax_bulk_delist_filtered'));
+        add_action('wp_ajax_wc_pm_search_products', array($this, 'ajax_search_products'));
     }
 
     public function add_admin_menu() {
@@ -100,15 +101,17 @@ class WC_Promotions_Manager {
         $total_pages = max(1, ceil($total / $this->per_page));
         ?>
         <div class="wrap wc-pm-container">
-            <div class="wc-pm-header">
-                <h1>
-                    <span class="dashicons dashicons-tagcloud"></span>
-                    <?php echo esc_html__('Gestor de Promociones', 'wc-promotions-manager'); ?>
-                </h1>
-                <p class="description"><?php echo esc_html__('Visualice, edite y gestione todas las promociones activas en su tienda.', 'wc-promotions-manager'); ?></p>
-            </div>
+            <!-- Dashboard View -->
+            <div id="wc-pm-dashboard-view" class="wc-pm-view">
+                <div class="wc-pm-header">
+                    <h1>
+                        <span class="dashicons dashicons-tagcloud"></span>
+                        <?php echo esc_html__('Gestor de Promociones', 'wc-promotions-manager'); ?>
+                    </h1>
+                    <p class="description"><?php echo esc_html__('Visualice, edite y gestione todas las promociones activas en su tienda.', 'wc-promotions-manager'); ?></p>
+                </div>
 
-            <!-- Stats Cards -->
+                <!-- Stats Cards -->
             <div class="wc-pm-stats-grid">
                 <div class="wc-pm-stat-card wc-pm-stat-primary">
                     <div class="wc-pm-stat-icon"><span class="dashicons dashicons-visibility"></span></div>
@@ -215,47 +218,77 @@ class WC_Promotions_Manager {
                     <?php $this->render_activity_log(); ?>
                 </div>
             </div>
+            </div> <!-- End Dashboard View -->
 
-            <!-- Create Promotion Modal -->
-            <div id="wc-pm-create-modal" class="wc-pm-modal-overlay">
-                <div class="wc-pm-modal wc-pm-modal-lg">
-                    <h3 class="wc-pm-modal-title"><span class="dashicons dashicons-plus-alt"></span> <?php esc_html_e('Crear Promoción Masiva', 'wc-promotions-manager'); ?></h3>
-                    <div class="wc-pm-modal-body">
-                        <div class="wc-pm-form-group">
-                            <label><?php esc_html_e('Aplicar a:', 'wc-promotions-manager'); ?></label>
-                            <div class="wc-pm-radio-group">
-                                <label><input type="radio" name="promo_target" value="filtered" checked> <?php esc_html_e('Productos filtrados actualmente', 'wc-promotions-manager'); ?></label>
-                                <label><input type="radio" name="promo_target" value="specific"> <?php esc_html_e('IDs de productos específicos (uno por línea)', 'wc-promotions-manager'); ?></label>
-                            </div>
-                            <textarea name="promo_product_ids" class="wc-pm-textarea" style="display:none;" rows="4" placeholder="123&#10;124&#10;125"></textarea>
+            <!-- Builder View -->
+            <div id="wc-pm-builder-view" class="wc-pm-view" style="display:none;">
+                <div class="wc-pm-header">
+                    <h1>
+                        <button class="button wc-pm-back-to-dashboard" style="margin-right: 12px;">
+                            <span class="dashicons dashicons-arrow-left-alt"></span> <?php esc_html_e('Volver al Dashboard', 'wc-promotions-manager'); ?>
+                        </button>
+                        <span class="dashicons dashicons-plus-alt"></span>
+                        <?php echo esc_html__('Crear Promoción Masiva', 'wc-promotions-manager'); ?>
+                    </h1>
+                    <p class="description"><?php echo esc_html__('Busque productos, agrégalos a la lista y aplique una promoción a todo el grupo.', 'wc-promotions-manager'); ?></p>
+                </div>
+
+                <div class="wc-pm-builder-layout">
+                    <!-- Left: Search & Results -->
+                    <div class="wc-pm-builder-search-section">
+                        <div class="wc-pm-search-box">
+                            <input type="text" id="wc-pm-product-search" placeholder="<?php esc_attr_e('Buscar por nombre, SKU o ID...', 'wc-promotions-manager'); ?>">
+                            <button class="button button-primary" id="wc-pm-search-btn">
+                                <span class="dashicons dashicons-search"></span> <?php esc_html_e('Buscar', 'wc-promotions-manager'); ?>
+                            </button>
                         </div>
-                        <div class="wc-pm-form-row">
-                            <div class="wc-pm-form-group">
-                                <label><?php esc_html_e('Tipo de descuento:', 'wc-promotions-manager'); ?></label>
-                                <select name="promo_discount_type">
-                                    <option value="percent"><?php esc_html_e('Porcentaje (%)', 'wc-promotions-manager'); ?></option>
-                                    <option value="fixed"><?php esc_html_e('Monto fijo', 'wc-promotions-manager'); ?></option>
-                                </select>
-                            </div>
-                            <div class="wc-pm-form-group">
-                                <label><?php esc_html_e('Valor del descuento:', 'wc-promotions-manager'); ?></label>
-                                <input type="number" name="promo_discount_value" step="0.01" min="0" class="wc-pm-input" required>
-                            </div>
-                        </div>
-                        <div class="wc-pm-form-row">
-                            <div class="wc-pm-form-group">
-                                <label><?php esc_html_e('Fecha de inicio:', 'wc-promotions-manager'); ?></label>
-                                <input type="date" name="promo_date_from" class="wc-pm-input">
-                            </div>
-                            <div class="wc-pm-form-group">
-                                <label><?php esc_html_e('Fecha de finalización:', 'wc-promotions-manager'); ?></label>
-                                <input type="date" name="promo_date_to" class="wc-pm-input">
-                            </div>
+                        <div id="wc-pm-search-results" class="wc-pm-search-results">
+                            <p class="wc-pm-empty-state"><?php esc_html_e('Realice una búsqueda para ver productos.', 'wc-promotions-manager'); ?></p>
                         </div>
                     </div>
-                    <div class="wc-pm-modal-actions">
-                        <button class="button wc-pm-modal-cancel"><?php esc_html_e('Cancelar', 'wc-promotions-manager'); ?></button>
-                        <button class="button button-primary wc-pm-modal-confirm"><?php esc_html_e('Aplicar Promoción', 'wc-promotions-manager'); ?></button>
+
+                    <!-- Right: Selected List & Settings -->
+                    <div class="wc-pm-builder-settings-section">
+                        <div class="wc-pm-selected-list-card">
+                            <h3>
+                                <span class="dashicons dashicons-clipboard"></span> 
+                                <?php esc_html_e('Productos Seleccionados', 'wc-promotions-manager'); ?>
+                                <span class="wc-pm-selected-count">0</span>
+                            </h3>
+                            <div id="wc-pm-selected-products" class="wc-pm-selected-products-list">
+                                <p class="wc-pm-empty-state"><?php esc_html_e('Agregue productos desde el buscador.', 'wc-promotions-manager'); ?></p>
+                            </div>
+                        </div>
+
+                        <div class="wc-pm-promo-settings-card">
+                            <h3><span class="dashicons dashicons-tag"></span> <?php esc_html_e('Configuración de la Promoción', 'wc-promotions-manager'); ?></h3>
+                            <div class="wc-pm-form-row">
+                                <div class="wc-pm-form-group">
+                                    <label><?php esc_html_e('Tipo de descuento:', 'wc-promotions-manager'); ?></label>
+                                    <select id="wc-pm-discount-type">
+                                        <option value="percent"><?php esc_html_e('Porcentaje (%)', 'wc-promotions-manager'); ?></option>
+                                        <option value="fixed"><?php esc_html_e('Monto fijo', 'wc-promotions-manager'); ?></option>
+                                    </select>
+                                </div>
+                                <div class="wc-pm-form-group">
+                                    <label><?php esc_html_e('Valor del descuento:', 'wc-promotions-manager'); ?></label>
+                                    <input type="number" id="wc-pm-discount-value" step="0.01" min="0" class="wc-pm-input" required>
+                                </div>
+                            </div>
+                            <div class="wc-pm-form-row">
+                                <div class="wc-pm-form-group">
+                                    <label><?php esc_html_e('Fecha de inicio:', 'wc-promotions-manager'); ?></label>
+                                    <input type="date" id="wc-pm-date-from" class="wc-pm-input">
+                                </div>
+                                <div class="wc-pm-form-group">
+                                    <label><?php esc_html_e('Fecha de finalización:', 'wc-promotions-manager'); ?></label>
+                                    <input type="date" id="wc-pm-date-to" class="wc-pm-input">
+                                </div>
+                            </div>
+                            <button class="button button-primary button-hero wc-pm-apply-promo-btn" style="width: 100%; margin-top: 12px;" disabled>
+                                <span class="dashicons dashicons-yes-alt"></span> <?php esc_html_e('Aplicar Promoción a Seleccionados', 'wc-promotions-manager'); ?>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1293,6 +1326,62 @@ class WC_Promotions_Manager {
             'message' => sprintf(__('%d promociones delistadas correctamente', 'wc-promotions-manager'), $delisted),
             'count' => $delisted
         ));
+    }
+
+    public function ajax_search_products() {
+        check_ajax_referer('wc_pm_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => __('No tiene permisos suficientes', 'wc-promotions-manager')));
+        }
+
+        $search = sanitize_text_field($_POST['search']);
+        if (empty($search)) {
+            wp_send_json_success(array('results' => array()));
+        }
+
+        $args = array(
+            'post_type' => 'product',
+            'posts_per_page' => 20,
+            'post_status' => 'publish',
+        );
+
+        // If search is numeric, prioritize ID search
+        if (is_numeric($search)) {
+            $args['post__in'] = array(intval($search));
+        } else {
+            $args['s'] = $search;
+            $args['meta_query'] = array(
+                'relation' => 'OR',
+                array(
+                    'key' => '_sku',
+                    'value' => $search,
+                    'compare' => 'LIKE'
+                )
+            );
+        }
+
+        $products = get_posts($args);
+        $results = array();
+
+        foreach ($products as $post) {
+            $product = wc_get_product($post->ID);
+            if (!$product) continue;
+
+            $image_id = $product->get_image_id();
+            $image_url = $image_id ? wp_get_attachment_image_url($image_id, 'thumbnail') : wc_placeholder_img_src('thumbnail');
+            
+            $results[] = array(
+                'id' => $product->get_id(),
+                'name' => $product->get_name(),
+                'sku' => $product->get_sku(),
+                'price' => $product->get_regular_price(),
+                'type' => $product->get_type(),
+                'image' => $image_url
+            );
+        }
+
+        wp_send_json_success(array('results' => $results));
     }
 }
 
