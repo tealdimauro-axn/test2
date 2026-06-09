@@ -536,12 +536,15 @@
         // ==========================================
         let selectedProducts = [];
 
-        $('.wc-pm-create-promo-btn').on('click', function() {
+        $(document).on('click', '.wc-pm-create-promo-btn', function(e) {
+            e.preventDefault();
+            console.log('Crear promoción clicked');
             $('#wc-pm-dashboard-view').hide();
             $('#wc-pm-builder-view').show();
         });
 
-        $('.wc-pm-back-to-dashboard').on('click', function() {
+        $(document).on('click', '.wc-pm-back-to-dashboard', function(e) {
+            e.preventDefault();
             $('#wc-pm-builder-view').hide();
             $('#wc-pm-dashboard-view').show();
             // Reset builder state
@@ -727,7 +730,8 @@
         // ==========================================
         // Delist Filtered Logic
         // ==========================================
-        $('.wc-pm-delist-filtered-btn').on('click', function() {
+        $(document).on('click', '.wc-pm-delist-filtered-btn', function(e) {
+            e.preventDefault();
             showModal(
                 'Delistar promociones filtradas',
                 '¿Está seguro que desea delistar TODAS las promociones que coincidan con los filtros actuales? Esta acción no se puede deshacer.',
